@@ -1,6 +1,6 @@
 """
 bot/handlers/user/redeem.py
-Redeem code ConversationHandler
+Redeem code ConversationHandler — Back button bug fixed
 """
 
 import logging
@@ -27,42 +27,61 @@ logger = logging.getLogger(__name__)
 
 async def ask_redeem_code(update: Update, context: CallbackContext) -> int:
     await update.message.reply_text(
-        "🎁 *Redeem Code*\n\nআপনার কোডটি টাইপ করুন:",
-        parse_mode="Markdown",
+        "🎁 <b>Redeem Code</b>\n\nআপনার কোডটি টাইপ করুন:",
+        parse_mode="HTML",
         reply_markup=back_keyboard(),
     )
     return REDEEM_ENTER_CODE
 
 
+async def redeem_back(update: Update, context: CallbackContext) -> int:
+    """Back button handler — conversation END করবে"""
+    await update.message.reply_text(
+        "🏠 Main Menu",
+        reply_markup=main_menu_keyboard(),
+    )
+    return ConversationHandler.END
+
+
 async def process_redeem_code(update: Update, context: CallbackContext) -> int:
-    text = update.message.text.strip().upper()
+    # ✅ raw text থেকে back check — upper() করার আগে
+    raw_text = update.message.text.strip()
     uid = update.effective_user.id
 
-    if text == "⬅️ Back":
-        await update.message.reply_text("🏠 Main Menu", reply_markup=main_menu_keyboard())
-        return ConversationHandler.END
+    # Extra safety: যদি কেউ manually "back" লেখে
+    if raw_text.lower() in ("back", "⬅️ back"):
+        return await redeem_back(update, context)
+
+    text = raw_text.upper()
 
     async with get_session() as db:
-        # Fetch code
         result = await db.execute(
-            select(RedeemCode).where(RedeemCode.code == text, RedeemCode.is_active == True)
+            select(RedeemCode).where(
+                RedeemCode.code == text,
+                RedeemCode.is_active == True,
+            )
         )
         code: RedeemCode | None = result.scalar_one_or_none()
 
         if not code:
             await update.message.reply_text(
-                "❌ কোডটি সঠিক নয় অথবা নিষ্ক্রিয়।\n\nআবার চেষ্টা করুন:",
+                "❌ কোডটি সঠিক নয় অথবা নিষ্ক্রিয়।\n\n"
+                "আবার চেষ্টা করুন অথবা Back চাপুন:",
                 reply_markup=back_keyboard(),
             )
             return REDEEM_ENTER_CODE
 
         # Expiry check
-        if code.expires_at and code.expires_at < datetime.now(timezone.utc):
-            await update.message.reply_text(
-                "❌ এই কোডের মেয়াদ শেষ হয়ে গেছে।",
-                reply_markup=main_menu_keyboard(),
-            )
-            return ConversationHandler.END
+        if code.expires_at:
+            expires = code.expires_at
+            if expires.tzinfo is None:
+                expires = expires.replace(tzinfo=timezone.utc)
+            if expires < datetime.now(timezone.utc):
+                await update.message.reply_text(
+                    "❌ এই কোডের মেয়াদ শেষ হয়ে গেছে।",
+                    reply_markup=main_menu_keyboard(),
+                )
+                return ConversationHandler.END
 
         # Max uses check
         if code.max_uses is not None and code.used_count >= code.max_uses:
@@ -80,7 +99,7 @@ async def process_redeem_code(update: Update, context: CallbackContext) -> int:
             )
         )
         user_usage_count = usage_result.scalar() or 0
-        if user_usage_count >= code.max_per_user:
+        if code.max_per_user and user_usage_count >= code.max_per_user:
             await update.message.reply_text(
                 "❌ আপনি এই কোড আগেই ব্যবহার করেছেন।",
                 reply_markup=main_menu_keyboard(),
@@ -88,15 +107,12 @@ async def process_redeem_code(update: Update, context: CallbackContext) -> int:
             return ConversationHandler.END
 
         # Calculate credits
-        if code.code_type == "gift":
-            credits_to_add = code.credits
-        elif code.code_type == "coupon":
-            # Percentage bonus on current balance
+        if code.code_type == "coupon":
             from bot.services.credit_service import get_balance
             balance = await get_balance(uid)
-            credits_to_add = int(balance * code.bonus_percent / 100)
+            credits_to_add = int(balance * (code.bonus_percent or 0) / 100)
             if credits_to_add < 1:
-                credits_to_add = code.credits  # fallback
+                credits_to_add = code.credits
         else:
             credits_to_add = code.credits
 
@@ -105,19 +121,19 @@ async def process_redeem_code(update: Update, context: CallbackContext) -> int:
         code.used_count += 1
         await db.flush()
 
-    # Add credits
+    # Add credits (session এর বাইরে)
     result = await add_credits(uid, credits_to_add, reason=f"redeem:{text}")
-    if not result["success"]:
+    if not result.get("success"):
         await update.message.reply_text(
             error_message("ক্রেডিট যোগ করতে সমস্যা হয়েছে।"),
-        parse_mode="Markdown",
+            parse_mode="HTML",
             reply_markup=main_menu_keyboard(),
         )
         return ConversationHandler.END
 
     await update.message.reply_text(
         redeem_success_message(text, credits_to_add, result["balance_after"]),
-        parse_mode="Markdown",
+        parse_mode="HTML",
         reply_markup=main_menu_keyboard(),
     )
     return ConversationHandler.END
@@ -125,14 +141,20 @@ async def process_redeem_code(update: Update, context: CallbackContext) -> int:
 
 def build_redeem_handler() -> ConversationHandler:
     return ConversationHandler(
-        entry_points=[MessageHandler(filters.Regex("^🎁 Redeem$"), ask_redeem_code)],
+        entry_points=[
+            MessageHandler(filters.Regex("^🎁 Redeem$"), ask_redeem_code)
+        ],
         states={
             REDEEM_ENTER_CODE: [
-                MessageHandler(filters.TEXT & ~filters.COMMAND, process_redeem_code)
+                # ✅ Back button — আগে check হবে, process_redeem_code এর আগে
+                MessageHandler(filters.Regex("^⬅️"), redeem_back),
+                MessageHandler(filters.TEXT & ~filters.COMMAND, process_redeem_code),
             ],
         },
         fallbacks=[
-            MessageHandler(filters.Regex("^/cancel$"), lambda u, c: ConversationHandler.END)
+            MessageHandler(filters.Regex("^⬅️"), redeem_back),
+            MessageHandler(filters.Regex("^/cancel$"), redeem_back),
+            MessageHandler(filters.Regex("^/start$"), redeem_back),
         ],
         conversation_timeout=CONVERSATION_TIMEOUT_SECONDS,
         allow_reentry=True,
