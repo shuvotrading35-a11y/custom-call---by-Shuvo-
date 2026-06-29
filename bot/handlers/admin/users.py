@@ -304,32 +304,33 @@ async def test_api_callback(update: Update, context: CallbackContext) -> None:
         await query.edit_message_text(f"❌ API Unreachable!\n\nError: {result.get('error')}")
 
 
-# ── Register all admin handlers ───────────────────────────────────────────────
+# ── Register all admin handlers ───────────────────────────────────────────
 def register_admin_handlers(app) -> None:
+    """Register all admin menu handlers"""
     from bot.config.settings import settings as s
 
     app.add_handler(CommandHandler("admin", admin_entry))
+    
+    # ✅ All main menu buttons
+    app.add_handler(MessageHandler(filters.Regex("^👥 Users$"), search_user_start))
+    app.add_handler(MessageHandler(filters.Regex("^📞 Calls$"), show_calls))
+    app.add_handler(MessageHandler(filters.Regex("^📂 Bulk Calls$"), show_bulk_calls))
+    app.add_handler(MessageHandler(filters.Regex("^💳 Credits$"), show_credits))
+    app.add_handler(MessageHandler(filters.Regex("^💰 Payments$"), show_payments))
+    app.add_handler(MessageHandler(filters.Regex("^📢 Broadcast$"), show_broadcast))
     app.add_handler(MessageHandler(filters.Regex("^📊 Analytics$"), show_analytics))
     app.add_handler(MessageHandler(filters.Regex("^⚙️ Settings$"), show_api_config))
+    app.add_handler(MessageHandler(filters.Regex("^🛡️ Security$"), show_security))
+    app.add_handler(MessageHandler(filters.Regex("^🤖 Bot Status$"), show_bot_status))
+    app.add_handler(MessageHandler(filters.Regex("^📂 Logs$"), show_logs))
 
-    # Callbacks
+    # Callback handlers
     app.add_handler(CallbackQueryHandler(ban_user_callback, pattern=r"^admin:(ban|unban):"))
     app.add_handler(CallbackQueryHandler(approve_payment,   pattern=r"^pay:approve:"))
     app.add_handler(CallbackQueryHandler(reject_payment,    pattern=r"^pay:reject:"))
     app.add_handler(CallbackQueryHandler(test_api_callback, pattern=r"^admin:api:test$"))
 
-    # Add credits conversation
-    app.add_handler(ConversationHandler(
-        entry_points=[CallbackQueryHandler(add_credits_start, pattern=r"^admin:credits:")],
-        states={
-            ADMIN_ENTER_CREDITS: [MessageHandler(filters.TEXT & ~filters.COMMAND, receive_credit_amount)],
-        },
-        fallbacks=[],
-        conversation_timeout=CONVERSATION_TIMEOUT_SECONDS,
-        name="admin_credits",
-    ))
-
-    # User search conversation
+    # Conversations
     app.add_handler(ConversationHandler(
         entry_points=[MessageHandler(filters.Regex("^👥 Users$"), search_user_start)],
         states={
@@ -338,4 +339,14 @@ def register_admin_handlers(app) -> None:
         fallbacks=[],
         conversation_timeout=CONVERSATION_TIMEOUT_SECONDS,
         name="admin_user_search",
+    ))
+
+    app.add_handler(ConversationHandler(
+        entry_points=[CallbackQueryHandler(add_credits_start, pattern=r"^admin:credits:")],
+        states={
+            ADMIN_ENTER_CREDITS: [MessageHandler(filters.TEXT & ~filters.COMMAND, receive_credit_amount)],
+        },
+        fallbacks=[],
+        conversation_timeout=CONVERSATION_TIMEOUT_SECONDS,
+        name="admin_credits",
     ))
