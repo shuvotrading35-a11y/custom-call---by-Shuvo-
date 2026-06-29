@@ -1,0 +1,49 @@
+# Core Bot Framework
+python-telegram-bot==21.5
+httpx==0.27.0
+
+# Async HTTP Client
+aiohttp==3.9.5
+aiofiles==23.2.1
+
+# ASGI / Web Server
+fastapi==0.111.0
+uvicorn[standard]==0.29.0
+
+# Database
+sqlalchemy[asyncio]==2.0.30
+asyncpg==0.29.0
+aiosqlite==0.20.0
+alembic==1.13.1
+psycopg2-binary==2.9.9
+
+# Task Queue
+celery[redis]==5.4.0
+redis==5.0.4
+
+# Scheduler
+apscheduler==3.10.4
+
+# Data Processing
+pandas==2.2.2
+openpyxl==3.1.2
+xlrd==2.0.1
+
+# Security & Crypto
+cryptography==42.0.7
+python-jose[cryptography]==3.3.0
+passlib==1.7.4
+
+# Configuration
+python-dotenv==1.0.1
+pydantic==2.7.1
+pydantic-settings==2.2.1
+
+# Logging & Monitoring
+sentry-sdk==2.3.1
+structlog==24.1.0
+
+# Utilities
+pytz==2024.1
+phonenumbers==8.13.37
+Pillow==10.3.0

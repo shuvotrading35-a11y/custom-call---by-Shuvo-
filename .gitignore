@@ -1,0 +1,51 @@
+# Environment variables - NEVER commit these!
+.env
+.env.local
+.env.production
+*.env
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+.venv/
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Logs
+*.log
+logs/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Alembic versions (optional - uncomment if you want to ignore)
+# bot/database/migrations/versions/
+
+# Upload files
+uploads/
+temp/
+tmp/
+
+# Celery
+celerybeat-schedule
+celerybeat.pid
