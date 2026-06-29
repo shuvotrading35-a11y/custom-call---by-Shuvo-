@@ -80,7 +80,7 @@ async def process_redeem_code(update: Update, context: CallbackContext) -> int:
             )
         )
         user_usage_count = usage_result.scalar() or 0
-        if user_usage_count >= code.per_user_limit:
+        if user_usage_count >= code.max_per_user:
             await update.message.reply_text(
                 "❌ আপনি এই কোড আগেই ব্যবহার করেছেন।",
                 reply_markup=main_menu_keyboard(),

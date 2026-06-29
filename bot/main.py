@@ -25,6 +25,7 @@ from bot.handlers.user.referral     import register_referral_handler
 from bot.handlers.user.support      import build_support_handler
 from bot.handlers.bulk_calls.campaign_manager import build_bulk_campaign_handler
 from bot.handlers.admin.users       import register_admin_handlers
+from bot.handlers.admin.redeem      import build_admin_redeem_handler
 
 logger = logging.getLogger(__name__)
 
@@ -43,6 +44,7 @@ def build_application() -> Application:
     app.add_handler(TypeHandler(Update, user_middleware), group=-999)
 
     # ConversationHandlers
+    app.add_handler(build_admin_redeem_handler())  # Admin first (priority)
     app.add_handler(build_tts_call_handler())
     app.add_handler(build_credits_handler())
     app.add_handler(build_redeem_handler())
